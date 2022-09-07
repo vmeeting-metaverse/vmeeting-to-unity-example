@@ -5,15 +5,6 @@ import { Unity } from "react-unity-webgl";
 import "./unityPlayer.css";
 
 const UnityPlayer = (props: any): JSX.Element => {
-  const { sendMessage, isLoaded } = props.unityContext;
-
-  useEffect(() => {
-    if (isLoaded) {
-      const url = process.env.REACT_APP_UNITY_BACKEND_DOMAN;
-      sendMessage("MyNetworkManager", "comm_ConnectServer", url);
-    }
-  }, [isLoaded, sendMessage]);
-
   return (
     <div className="unity_player__wrapper">
       {props.unityContext.unityProvider && (

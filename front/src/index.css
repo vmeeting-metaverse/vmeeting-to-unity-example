@@ -31,6 +31,23 @@ code {
   flex-direction: column;
 }
 
+.info {
+  display: flex;
+  flex-direction: row;
+}
+
+.room_name_input {
+  margin: 10px 0px 0px 10px;
+  width: 200px;
+  min-height: 38px;
+  border:1px solid hsl(0, 0%, 80%);
+  border-radius:4px;
+  outline:none;
+  padding:8px;
+  box-sizing:border-box;
+  transition:.2s;
+}
+
 .videos_container {
   display: flex;
   flex-direction: row;
@@ -42,33 +59,38 @@ code {
   flex-direction: column;
 }
 
-.local_video {
+.video {
   display: flex;
   background-color: black;
   color: white;
   width: 320px;
   height: 180px;
   margin: 5px;
-  
-  text-align: center;
-  align-items: center;
-  justify-content: center;
 }
 
-.remote_video {
+.video_title {
   display: flex;
-  background-color: black;
-  width: 320px;
-  height: 180px;
-  margin: 5px;
-  color: white;
-
   text-align: center;
   align-items: center;
   justify-content: center;
+  font-size: larger;
+  font-weight: bolder;
 }
 
 .test_img {
+  display: none;
+  background-color: black;
+  width: 320px;
+  height: 180px;
+  margin: 5px;
+  color: white;
+
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+}
+
+.test_canvas {
   display: flex;
   background-color: black;
   width: 320px;
@@ -81,8 +103,14 @@ code {
   justify-content: center;
 }
 
+.button_container {
+  display: flex;
+  flex-direction: row;
+}
+
 .button_join, 
-.button_default {
+.button_default,
+.button_stop {
   width:100px;
   display:flex;
   justify-content: center;
@@ -99,6 +127,15 @@ code {
   cursor: pointer;
 }
 
+.button_join {
+  margin: 10px auto 0px 10px;
+}
+
+.button_stop {
+  background-color: #ff4d4f;
+  color: white;
+}
+
 .button_join:hover, 
 .button_default:hover {
   color: rgba(0, 0, 77, 0.8);
@@ -106,6 +143,8 @@ code {
   box-shadow:0 0 4px 0 rgba(0, 0, 77, 0.8);
 }
 
-.button_join{
-  margin: 10px auto 0px 10px;
+.button_stop:hover {
+  color: white;
+  border-color:#ff4d4f;
+  box-shadow:0 0 4px 0 #ff4d4f; 
 }

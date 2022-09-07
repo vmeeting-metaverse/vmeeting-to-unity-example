@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 
 import { useUnityContext } from 'react-unity-webgl';
 import UnityPlayer from './components/UnityPlayer';
@@ -7,6 +7,8 @@ import LocalMedia from './components/Vmeeting/LocalMedia';
 import { useVmeetingSpace } from './libs/vmeeting/hooks';
 
 import { exampleImage } from "./libs/constants";
+
+import { createFrameSender } from './libs/FrameSender';
 
 const ROOT = process.env.PUBLIC_URL;
 const BUILD_URL = ROOT + '/Build';
@@ -20,33 +22,53 @@ const CONFIG = {
 
 function App() {
   const unityCtx = useUnityContext(CONFIG);
-  const { sendMessage } = unityCtx;
 
   const { enterSpace, exitSpace, conferenceRoomParticipants } = useVmeetingSpace(true, unityCtx);
 
-  const imgRef = useRef<any>();
-  const onClickSend = () => {
-    const canvas: any = document.createElement('canvas');
-    canvas.width = imgRef.current.naturalWidth;
-    canvas.height = imgRef.current.naturalHeight;
+  const [roomName, setRoomName] = useState('');
+  const onChangeRoomName = (e: any) => {
+    setRoomName(e.target.value);
+  };
 
-    canvas.getContext('2d').drawImage(imgRef.current, 0, 0);
+  const localVideoRef = useRef<any>();
+  const remoteVideoRef = useRef<any>();
 
-    const dataURL = canvas.toDataURL();
-    //console.log(dataURL);
-    const base64 = getBase64StringFromDataURL(dataURL);
-    //console.log(base64);
+  let localVideoFrameSender: any = null;
+  let remoteVideoFrameSender: any = null;
 
-    const param = {
-      id: "1",
-      data: base64,
-    };
-    const param_string = JSON.stringify(param);
-    sendMessage('CommManager', 'comm_setImage', param_string);
+  const onClickSend = (id: any) => {
+    if(id === "1"){
+      if (!localVideoFrameSender){
+        localVideoFrameSender = createFrameSender(localVideoRef, unityCtx, "1");
+        localVideoFrameSender.startSend();
+      }
+    }
+    else if (id === "2"){
+      if (!remoteVideoFrameSender){
+        remoteVideoFrameSender = createFrameSender(remoteVideoRef, unityCtx, "2");
+        remoteVideoFrameSender.startSend();
+      }
+    }
+    else {
+      console.log("Invalid ID!");
+    }
   }
 
-  const getBase64StringFromDataURL = (dataURL: any) =>
-    dataURL.replace('data:', '').replace(/^.+,/, '');
+  const onClickStop = (id: any) => {
+    if(id === "1"){
+      if (localVideoFrameSender){
+        localVideoFrameSender.stopSend();
+      }
+    }
+    else if (id === "2"){
+      if (remoteVideoFrameSender){
+        remoteVideoFrameSender.stopSend();
+      }
+    }
+    else {
+      console.log("Invalid ID!");
+    }
+  }
   
   return (
     <div className="App" style={{ width: '100%', height: '100%', display:'flex' }}>
@@ -54,32 +76,35 @@ function App() {
         <UnityPlayer unityContext={unityCtx} />
       </div>
       <div className='test_ui'>
-        <div className='button_join'>
-          Join
-        </div>
-        <div className='videos_container'>
-          <div className='video_container'>
-            <div className='local_video'>
-              Local Video
-            </div>
-            <div className='button_default'>
-              Send
-            </div>
-          </div>
-          <div className='video_container'>
-            <div className='remote_video'>
-              Remote Video
-            </div>
-            <div className='button_default'>
-              Send
-            </div>
+        <div className="info">
+          <input className="room_name_input" type="text" onChange={onChangeRoomName} />
+          <div className='button_join'>
+            Join
           </div>
         </div>
         <div className='videos_container'>
           <div className='video_container'>
-            <img className='test_img' src={exampleImage} ref={imgRef}/>
-            <div className='button_default' onClick={onClickSend}>
-              Send
+            <div className='video_title'> Local Video </div>
+            <video className='video' ref={localVideoRef} src="/sample-15s.mp4" controls/>
+            <div className='button_container'>
+              <div className='button_default'onClick={() => onClickSend("1")}>
+                Send
+              </div>
+              <div className='button_stop'onClick={() => onClickStop("1")}>
+                Stop
+              </div>
+            </div>
+          </div>
+          <div className='video_container'>
+            <div className='video_title'> Remote Video </div>
+            <video className='video' ref={remoteVideoRef} src="/sample-15s.mp4" controls/>
+            <div className='button_container'>
+              <div className='button_default'onClick={() => onClickSend("2")}>
+                Send
+              </div>
+              <div className='button_stop'onClick={() => onClickStop("2")}>
+                Stop
+              </div>
             </div>
           </div>
         </div>
