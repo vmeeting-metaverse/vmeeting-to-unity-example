@@ -7,7 +7,6 @@
 - Docker
 - Docker Compose
 - [Unity] WebGL Build => WebGL Build 시에 에러가 발생하는지 여부를 반드시 확인한다.
-- [Unity] Mirror Server => 기본적으로 Unity 내부에서의 멀티플레이어 기능은 Mirror에 기반한다는 가정하에 작업을 한다.
 - [Web] React
 - [Communication Channel] [React-Unity-WebGL](https://github.com/jeffreylanters/react-unity-webgl)
 
@@ -28,28 +27,20 @@ vmeeting API는 vmeeting JWT가 있어야 정상작동하기 때문에 해당 to
 
 ### Unity Build File 적용하기
 
-1. **Server** 폴더와 **Build** 폴더를 각 위치에 둔다. 아래를 참고한다.
+1. **Build** 폴더를 정해진 위치에 둔다. 아래를 참고한다.
 
 ```
 |-- ...
-|-- front
-| |-- ...
-| `-- public
-|   |-- ...
-|   `-- Build
-|     |-- Client.data.unityweb
-|     |-- Client.framework.js.unityweb
-|     |-- Client.loader.js
-|     `-- Client.wasm.unityweb
-`-- mirror
+`-- front
   |-- ...
-  `-- Server
-      |-- LinuxPlayer_s.debug
-      |-- Server.x86_64
-      |-- UnityPlayer_s.debug
-      |-- UnityPlayer.so
-      `-- Server_Data/
-        `-- ...
+  `-- public
+    |-- ...
+    `-- Build
+      |-- Client.data.unityweb
+      |-- Client.framework.js.unityweb
+      |-- Client.loader.js
+      `-- Client.wasm.unityweb
+
 ```
 
 
@@ -68,4 +59,4 @@ $ docker-compose up --build -d
 
 ## 기반한 Unity Project
 
-https://github.com/vmeeting-metaverse/metaverse-unity-2022
+https://github.com/vmeeting-metaverse/unity-frame-viewer

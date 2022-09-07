@@ -6,7 +6,7 @@ import ConferenceRoom from './components/Vmeeting/ConferenceRoom';
 import LocalMedia from './components/Vmeeting/LocalMedia';
 import { useVmeetingSpace } from './libs/vmeeting/hooks';
 
-import { defaultUserImage } from "./libs/constants";
+import { exampleImage } from "./libs/constants";
 
 const ROOT = process.env.PUBLIC_URL;
 const BUILD_URL = ROOT + '/Build';
@@ -33,9 +33,16 @@ function App() {
     canvas.getContext('2d').drawImage(imgRef.current, 0, 0);
 
     const dataURL = canvas.toDataURL();
-    console.log(dataURL);
+    //console.log(dataURL);
     const base64 = getBase64StringFromDataURL(dataURL);
-    console.log(base64);
+    //console.log(base64);
+
+    const param = {
+      id: "1",
+      data: base64,
+    };
+    const param_string = JSON.stringify(param);
+    sendMessage('CommManager', 'comm_setImage', param_string);
   }
 
   const getBase64StringFromDataURL = (dataURL: any) =>
@@ -70,7 +77,7 @@ function App() {
         </div>
         <div className='videos_container'>
           <div className='video_container'>
-            <img className='test_img' src={defaultUserImage} ref={imgRef}/>
+            <img className='test_img' src={exampleImage} ref={imgRef}/>
             <div className='button_default' onClick={onClickSend}>
               Send
             </div>

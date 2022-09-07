@@ -40,18 +40,3 @@ services:
     env_file: .env
     volumes:
       - "./front:/app"
-
-  unity-backend:
-    image: "ubuntu:latest"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.unity-backend.tls=true"
-      - "traefik.http.routers.unity-backend.entrypoints=web,websecure"
-      - "traefik.http.routers.unity-backend.rule=Host(`$DOMAIN_NAME`) && PathPrefix(`/unity-backend`)"
-      - "traefik.http.middlewares.unity-backend.stripprefix.prefixes=/unity-backend"
-      - "traefik.http.services.unity-backend.loadbalancer.server.port=7778"
-    env_file: .env
-    volumes:
-      - "./mirror:/app"
-    working_dir: /app
-    command: sh -c "chmod +x ./Server/Server.x86_64 && ./Server/Server.x86_64"
