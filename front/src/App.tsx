@@ -6,8 +6,6 @@ import ConferenceRoom from './components/Vmeeting/ConferenceRoom';
 import LocalMedia from './components/Vmeeting/LocalMedia';
 import { useVmeetingSpace } from './libs/vmeeting/hooks';
 
-import { exampleImage } from "./libs/constants";
-
 import { createFrameSender } from './libs/FrameSender';
 
 const ROOT = process.env.PUBLIC_URL;
@@ -29,6 +27,10 @@ function App() {
   const onChangeRoomName = (e: any) => {
     setRoomName(e.target.value);
   };
+
+  const onClickJoin = () => {
+    console.log('Target Room Name: ', roomName);
+  }
 
   const localVideoRef = useRef<any>();
   const remoteVideoRef = useRef<any>();
@@ -58,11 +60,13 @@ function App() {
     if(id === "1"){
       if (localVideoFrameSender){
         localVideoFrameSender.stopSend();
+        localVideoFrameSender = null;
       }
     }
     else if (id === "2"){
       if (remoteVideoFrameSender){
         remoteVideoFrameSender.stopSend();
+        remoteVideoFrameSender = null;
       }
     }
     else {
@@ -78,14 +82,14 @@ function App() {
       <div className='test_ui'>
         <div className="info">
           <input className="room_name_input" type="text" onChange={onChangeRoomName} />
-          <div className='button_join'>
+          <div className='button_join' onClick={onClickJoin}>
             Join
           </div>
         </div>
         <div className='videos_container'>
           <div className='video_container'>
             <div className='video_title'> Local Video </div>
-            <video className='video' ref={localVideoRef} src="/sample-15s.mp4" controls/>
+            <video className='video' ref={localVideoRef} src="/sample-15s.mp4" controls muted/>
             <div className='button_container'>
               <div className='button_default'onClick={() => onClickSend("1")}>
                 Send
@@ -97,7 +101,7 @@ function App() {
           </div>
           <div className='video_container'>
             <div className='video_title'> Remote Video </div>
-            <video className='video' ref={remoteVideoRef} src="/sample-15s.mp4" controls/>
+            <video className='video' ref={remoteVideoRef} src="/sample-15s.mp4" controls muted/>
             <div className='button_container'>
               <div className='button_default'onClick={() => onClickSend("2")}>
                 Send
