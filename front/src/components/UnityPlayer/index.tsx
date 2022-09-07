@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { Unity } from "react-unity-webgl";
-import SpawnManager from "../SpawnManager";
 import "./unityPlayer.css";
 
 const UnityPlayer = (props: any): JSX.Element => {
@@ -25,7 +24,6 @@ const UnityPlayer = (props: any): JSX.Element => {
           tabIndex={1}
         />
       )}
-      <SpawnManager unityContext={props.unityContext} />
       {!props.unityContext.isLoaded && (
         <div className="unity_player__loading-bar">
           <div className="unity_player__progress-bar-empty">

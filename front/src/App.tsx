@@ -1,8 +1,12 @@
+import React, { useRef } from 'react';
+
 import { useUnityContext } from 'react-unity-webgl';
 import UnityPlayer from './components/UnityPlayer';
 import ConferenceRoom from './components/Vmeeting/ConferenceRoom';
 import LocalMedia from './components/Vmeeting/LocalMedia';
 import { useVmeetingSpace } from './libs/vmeeting/hooks';
+
+import { defaultUserImage } from "./libs/constants";
 
 const ROOT = process.env.PUBLIC_URL;
 const BUILD_URL = ROOT + '/Build';
@@ -20,39 +24,57 @@ function App() {
 
   const { enterSpace, exitSpace, conferenceRoomParticipants } = useVmeetingSpace(true, unityCtx);
 
+  const imgRef = useRef<any>();
+  const onClickSend = () => {
+    const canvas: any = document.createElement('canvas');
+    canvas.width = imgRef.current.naturalWidth;
+    canvas.height = imgRef.current.naturalHeight;
+
+    canvas.getContext('2d').drawImage(imgRef.current, 0, 0);
+
+    const dataURL = canvas.toDataURL();
+    console.log(dataURL);
+    const base64 = getBase64StringFromDataURL(dataURL);
+    console.log(base64);
+  }
+
+  const getBase64StringFromDataURL = (dataURL: any) =>
+    dataURL.replace('data:', '').replace(/^.+,/, '');
+  
   return (
-    <div className="App" style={{ width: '100%', height: '100%' }}>
-      <UnityPlayer unityContext={unityCtx} />
-      <div
-        style={{
-          position: 'absolute',
-          top: '25px',
-          left: '25px',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'white',
-          padding: '10px',
-        }}
-      >
-        <h3>Space 변경</h3>
-        <div>
-          <button
-            onClick={() => {
-              sendMessage('WarpManager', 'comm_WarpToLobby');
-              exitSpace();
-            }}
-          >
-            Lobby
-          </button>
-          <button
-            onClick={() => {
-              sendMessage('TeamManager', 'comm_setTeamId', 'conference');
-              sendMessage('WarpManager', 'comm_WarpTo', 'conference');
-              enterSpace('conference');
-            }}
-          >
-            conferenceHall
-          </button>
+    <div className="App" style={{ width: '100%', height: '100%', display:'flex' }}>
+      <div className='unity_ui'>
+        <UnityPlayer unityContext={unityCtx} />
+      </div>
+      <div className='test_ui'>
+        <div className='button_join'>
+          Join
+        </div>
+        <div className='videos_container'>
+          <div className='video_container'>
+            <div className='local_video'>
+              Local Video
+            </div>
+            <div className='button_default'>
+              Send
+            </div>
+          </div>
+          <div className='video_container'>
+            <div className='remote_video'>
+              Remote Video
+            </div>
+            <div className='button_default'>
+              Send
+            </div>
+          </div>
+        </div>
+        <div className='videos_container'>
+          <div className='video_container'>
+            <img className='test_img' src={defaultUserImage} ref={imgRef}/>
+            <div className='button_default' onClick={onClickSend}>
+              Send
+            </div>
+          </div>
         </div>
       </div>
       <div
