@@ -1,0 +1,57 @@
+version: "3"
+services:
+  reverse-proxy:
+    image: "traefik:latest"
+    command:
+      - "--log.level=DEBUG" # for debugging
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesResolvers.letsencrypt-resolver.acme.email=youremail@gmail.com"
+      - "--certificatesResolvers.letsencrypt-resolver.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesResolvers.letsencrypt-resolver.acme.httpChallenge.entryPoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile.dev
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt-resolver"
+      - "traefik.http.routers.frontend.entrypoints=web,websecure"
+      - "traefik.http.routers.frontend.rule=Host(`$DOMAIN_NAME`) && PathPrefix(`/`)"
+      - "traefik.http.middlewares.frontend.stripprefix.prefixes=/"
+      - "traefik.http.routers.frontend.middlewares=frontend@docker,gzip@docker"
+      - "traefik.http.middlewares.gzip.compress=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    env_file: .env
+    volumes:
+      - "./front:/app"
+
+  unity-backend:
+    image: "ubuntu:latest"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.unity-backend.tls=true"
+      - "traefik.http.routers.unity-backend.entrypoints=web,websecure"
+      - "traefik.http.routers.unity-backend.rule=Host(`$DOMAIN_NAME`) && PathPrefix(`/unity-backend`)"
+      - "traefik.http.middlewares.unity-backend.stripprefix.prefixes=/unity-backend"
+      - "traefik.http.services.unity-backend.loadbalancer.server.port=7778"
+    env_file: .env
+    volumes:
+      - "./mirror:/app"
+    working_dir: /app
+    command: sh -c "chmod +x ./Server/Server.x86_64 && ./Server/Server.x86_64"

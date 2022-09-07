@@ -1,0 +1,80 @@
+.unity_player__wrapper {
+  width: 100;
+  height: 100%;
+  display: inline-block;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.unity_player__canvas {
+  width: 100%;
+  height: 100%;
+  background: #231f20;
+}
+
+.unity_player__label {
+  display: flex;
+  text-align: center;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 1.2em;
+}
+
+.unity_player__button {
+  border:none;
+  display: inline-block;
+  font-size: 1.2em;
+  padding: 10px 0 10px 0;
+  margin-top: 20px;
+  border-radius: 15px;
+  box-shadow: none;
+  color: white;
+  font-weight: 700;
+  background-color: #3769B1;
+  outline: #3769B1;
+  cursor: pointer;
+}
+
+.unity_player__loading-bar {
+  position: absolute;
+  display: block;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.unity_player__progress-bar-empty {
+  width: 141px;
+  height: 18px;
+  margin-top: 10px;
+  background: url("img/progress-bar-empty-dark.png") no-repeat center;
+}
+
+.unity_player__progress-bar-full {
+  height: 18px;
+  margin-top: 10px;
+  background: url("img/progress-bar-full-dark.png") no-repeat center;
+}
+
+.unity_player__footer {
+  position: relative;
+  text-align: center;
+}
+
+.unity_player__webgl-logo {
+  float: left;
+  width: 134px;
+  height: 38px;
+  background: url("img/watermark.png") no-repeat center;
+  background-size: 134px 38px;
+  cursor: pointer;
+}
+
+.unity_player__fullscreen-button {
+  float: right;
+  width: 38px;
+  height: 38px;
+  background: url("img/fullscreen-button.png") no-repeat center;
+  cursor: pointer;
+}

@@ -1,0 +1,29 @@
+@import '../../../styles/color.scss';
+
+.container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: row;
+}
+.controller {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0 10px;
+  .button {
+    border-radius: 50%;
+    padding: 10px;
+    border: none;
+    background-color: #808080;
+    cursor: pointer;
+    img {
+      width: 25px;
+      height: 25px;
+    }
+  }
+  .active {
+    background-color: $default-blue;
+  }
+}

@@ -1,0 +1,17 @@
+.vmeeting_media__wrapper {
+  overflow: hidden;
+  display: inline-block;
+  position: relative;
+  width: 320px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.vmeeting_media__image {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
