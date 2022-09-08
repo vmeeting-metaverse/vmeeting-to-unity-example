@@ -1,15 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useUnityContext } from 'react-unity-webgl';
 import UnityPlayer from './components/UnityPlayer';
-import ConferenceRoom from './components/Vmeeting/ConferenceRoom';
-import LocalMedia from './components/Vmeeting/LocalMedia';
 import { useVmeetingSpace } from './libs/vmeeting/hooks';
 
 import { createFrameSender } from './libs/FrameSender';
 import { useVmeeting } from './providers/Vmeeting';
-import { VmeetingTrackLocalAudio, VmeetingTrackLocalVideo } from './libs/vmeeting/track';
-import { VmeetingUser } from './libs/vmeeting/user';
+import { VmeetingTrackLocalVideo } from './libs/vmeeting/track';
 
 const ROOT = process.env.PUBLIC_URL;
 const BUILD_URL = ROOT + '/Build';
@@ -55,8 +52,14 @@ function App() {
     }
   }, [video]);
 
-
   const { enterSpace, exitSpace, nowRoomParticipants } = useVmeetingSpace(unityCtx);
+
+  useEffect(() => {
+    enterSpace('test');
+    return () => {
+      exitSpace();
+    }
+  }, []);
 
   useEffect(() => {
     if (nowRoomParticipants.size > 0) {
@@ -66,23 +69,6 @@ function App() {
       }
     }
   }, [nowRoomParticipants]);
-
-  const [roomName, setRoomName] = useState('');
-  const onChangeRoomName = (e: any) => {
-    setRoomName(e.target.value);
-  };
-
-  const [isJoined, setIsJoined] = useState(false);
-  const onClickJoin = async () => {
-    console.log('Target Room Name: ', roomName);
-    await enterSpace(roomName);
-    setIsJoined(true);
-  }
-
-  const onClickLeft = async () => {
-    await exitSpace();
-    setIsJoined(false);
-  }
 
   const localVideoRef = useRef<any>();
   const remoteVideoRef = useRef<any>();
@@ -132,10 +118,6 @@ function App() {
         <UnityPlayer unityContext={unityCtx} />
       </div>
       <div className='test_ui'>
-        <div className="info">
-          <input className="room_name_input" type="text" onChange={onChangeRoomName} disabled={isJoined} />
-          <div className='button_join' onClick={isJoined ? onClickLeft : onClickJoin}>{isJoined ? 'Left' : 'Join'}</div>
-        </div>
         <div className='videos_container'>
           <div className='video_container'>
             <div className='video_title'> Local Video </div>
@@ -162,18 +144,6 @@ function App() {
             </div>
           </div>
         </div>
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          top: 20,
-          right: 320,
-          left: 320,
-          overflowX: 'auto',
-          textAlign: 'center',
-          whiteSpace: 'nowrap',
-        }}
-      >
       </div>
     </div>
   );
