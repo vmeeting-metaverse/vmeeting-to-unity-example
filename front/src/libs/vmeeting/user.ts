@@ -5,24 +5,28 @@ import { JitsiMediaDevices, JitsiTrack } from './types';
 
 export class VmeetingUser {
   id: string;
+  vmeetingId: string;
   name?: string;
   audio?: VmeetingTrackAudio;
   video?: VmeetingTrackVideo;
   isMe: boolean;
   constructor({
     id,
+    vmeetingId,
     name,
     audio,
     video,
     isMe = false,
   }: {
     id: string;
+    vmeetingId: string;
     name?: string;
     audio?: VmeetingTrackAudio;
     video?: VmeetingTrackVideo;
     isMe?: boolean;
   }) {
     this.id = id;
+    this.vmeetingId = vmeetingId;
     this.name = name;
     this.audio = audio;
     this.video = video;
@@ -52,16 +56,18 @@ export class VmeetingMe extends VmeetingUser {
 
   constructor({
     id,
+    vmeetingId,
     name,
     audio,
     video,
   }: {
     id: string;
+    vmeetingId: string;
     name?: string;
     audio?: VmeetingTrackLocalAudio;
     video?: VmeetingTrackLocalVideo;
   }) {
-    super({ id, name, isMe: true });
+    super({ id, vmeetingId, name, isMe: true });
     this.audio = audio;
     this.video = video;
     this.devices = [];
@@ -80,13 +86,15 @@ export class VmeetingMe extends VmeetingUser {
       })
       .then(async (tracks: JitsiTrack[]) => {
         const _video = tracks[0];
-        await this.video?._track.dispose();
         const newVideo = new VmeetingTrackLocalVideo({ track: _video, mode });
+        await this.video?._track.dispose();
         this.setVideo(newVideo);
         return Promise.resolve(this.video);
       })
       .catch(async (e: Error) => {
-        await this.video?._track.dispose();
+        if (mode === 'camera') {
+          await this.video?._track.dispose();
+        }
         this.setVideo(undefined);
         return Promise.reject(e);
       });
@@ -146,16 +154,22 @@ export class VmeetingMe extends VmeetingUser {
   }
   async setVideo(video?: VmeetingTrackLocalVideo) {
     const oldVideo = this.video;
-    this.listeners.ON_VIDEO_CHANGED.forEach((fn) => {
-      fn.listener(oldVideo, video);
-    });
+    await Promise.all(
+      this.listeners.ON_VIDEO_CHANGED.map(async (fn) => {
+        await fn.listener(oldVideo, video);
+      }),
+    );
+    await oldVideo?.deconstructor();
     this.video = video;
   }
   async setAudio(audio?: VmeetingTrackLocalAudio) {
     const oldAudio = this.audio;
-    this.listeners.ON_AUDIO_CHANGED.forEach((fn) => {
-      fn.listener(oldAudio, audio);
-    });
+    await Promise.all(
+      this.listeners.ON_AUDIO_CHANGED.map(async (fn) => {
+        await fn.listener(oldAudio, audio);
+      }),
+    );
+    await oldAudio?.deconstructor();
     this.audio = audio;
   }
 }

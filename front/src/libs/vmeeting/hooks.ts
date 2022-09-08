@@ -1,210 +1,125 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { IUnityContextHook } from "react-unity-webgl/distribution/interfaces/unity-context-hook";
 import { useVmeeting } from "../../providers/Vmeeting";
-import { VmeetingAudiotorium, VmeetingRoom } from "./room";
+import { VmeetingConference, VmeetingConferenceEventListener } from "./room";
 import { VmeetingUser } from "./user";
-import _ from "lodash";
-import { DUMMY_JWT } from "../constants";
 
-export const useVmeetingAuditorium = () => {
+const vmConf = new VmeetingConference();
+
+export const useVmeetingSpace = (unityContext: IUnityContextHook) => {
   const app = useVmeeting();
-  const [auditorium, setAuditorium] = useState<VmeetingAudiotorium>();
-  const [presenter, setPresenter] = useState<VmeetingUser>();
-
-  const enterAuditorium = async (name: string) => {
-    if (name === "") {
-      return new Error("Name is needed");
-    }
-    if (!app?.me) {
-      return new Error("Vmeeting App is not working well.");
-    }
-    const jwt = DUMMY_JWT;
-    if (!jwt) {
-      return new Error("App token is not set");
-    }
-    if (auditorium) {
-      await exitAuditorium();
-    }
-    const audi = new VmeetingAudiotorium({ name: name });
-    await audi.enter({ jwt: jwt, me: app.me });
-    audi.subscribe("ON_CHANGE_PLATFORM_OCCUPIER", (occupier?: VmeetingUser) => {
-      setPresenter(_.cloneDeep(occupier));
-    });
-    setAuditorium(audi);
-    app.rooms.set(name, audi);
-  };
-
-  const exitAuditorium = async () => {
-    if (!auditorium) {
-      return;
-    }
-    await auditorium.exit();
-    setAuditorium(undefined);
-  };
-
-  const getOnPlatform = useCallback(() => {
-    if (!auditorium) {
-      return new Error("Auditorium is not exist");
-    }
-    auditorium.getOnThePlatform();
-  }, [auditorium]);
-
-  const getOffPlatform = useCallback(() => {
-    if (!auditorium) {
-      return new Error("Auditorium is not exist");
-    }
-    auditorium.getOffThePlatform();
-  }, [auditorium]);
-
-  return {
-    enterAuditorium,
-    exitAuditorium,
-    getOnPlatform,
-    getOffPlatform,
-    presenter,
-    auditorium,
-  };
-};
-
-export const useVmeetingConferenceRoom = () => {
-  const app = useVmeeting();
-  const [participants, setParticipants] = useState<Map<string, VmeetingUser>>(
-    new Map()
-  );
-  const enterRoom = async (name: string) => {
-    if (name === "") {
-      return new Error("Name is needed");
-    }
-    if (!app?.me) {
-      return new Error("Vmeeting App is not working well.");
-    }
-    const jwt = DUMMY_JWT;
-    if (!jwt) {
-      return new Error("App token is not set");
-    }
-    const room = new VmeetingRoom({ name: name });
-    await room.enter({ jwt, me: app.me });
-    room.subscribe("ON_PARTICIPANTS_CHANGED", (ps) => {
-      setParticipants(_.cloneDeep(ps));
-    });
-    app.rooms.set(name, room);
-  };
-
-  const exitRoom = async (name: string) => {
-    const room = app?.rooms.get(name);
-    if (room) {
-      await room.exit();
-      app?.rooms.delete(name);
-      setParticipants(new Map());
-    }
-  };
-
-  return {
-    enterRoom,
-    exitRoom,
-    participants,
-  };
-};
-
-interface SpaceReturn {
-  enterSpace: (name: string) => Promise<Error | void>;
-  exitSpace: () => Promise<void>;
-  presenter?: VmeetingUser;
-  conferenceRoomParticipants: Map<string, VmeetingUser>;
-}
-
-export const useVmeetingSpace = (
-  platformYN: boolean,
-  unityContext: IUnityContextHook
-): SpaceReturn => {
-  const app = useVmeeting();
-  const [spaceName, setSpaceName] = useState<string>();
-  const { enterRoom, exitRoom, participants } = useVmeetingConferenceRoom();
   const { addEventListener, removeEventListener } = unityContext;
-  const {
-    getOnPlatform,
-    getOffPlatform,
-    enterAuditorium,
-    exitAuditorium,
-    presenter,
-  } = useVmeetingAuditorium();
+  const [spaceName, setSpaceName] = useState<string>();
+  const [roomName, setRoomName] = useState<string>();
 
-  useEffect(() => {
-    if (spaceName && platformYN) {
-      const StageEnter = (e: any) => {
-        const isEntered = e;
-        if (isEntered) {
-          console.info(`get on platform: ${spaceName}-platform`);
-          getOnPlatform();
-        } else {
-          console.info(`get off platform: ${spaceName}-platform`);
-          getOffPlatform();
+  const [participants, setParticipants] = useState<Map<string, VmeetingUser>>(new Map());
+  const [presenters, setPresenters] = useState<string[]>([]);
+  const [rooms, setRooms] = useState<Map<string, string[]>>(new Map());
+
+  const nowRoomParticipants = useMemo<Map<string, VmeetingUser>>(() => {
+    const ps = new Map();
+    if (roomName) {
+      rooms.get(roomName)?.forEach((pId) => {
+        const p = participants.get(pId);
+        if (p) {
+          ps.set(pId, p)
         }
-      };
-      addEventListener("StageEnter", StageEnter);
-      return () => {
-        removeEventListener("StageEnter", StageEnter);
-      };
+      });
     }
-  }, [app, spaceName, getOnPlatform, getOffPlatform]);
+    return ps;
+  }, [rooms, roomName, participants]);
+
+  const nowPresenters = useMemo<Map<string, VmeetingUser>>(() => {
+    const ps = new Map();
+    presenters.forEach((pId) => {
+      const p = participants.get(pId);
+      if (p) {
+        ps.set(pId, p)
+      }
+    });
+    return ps;
+  }, [presenters, participants]);
 
   useEffect(() => {
     if (spaceName) {
-      const privateRoomEnter = (e: any) => {
-        const data = JSON.parse(e);
-        if (data.state === "ENTER") {
-          console.info(`entered Room: ${spaceName}-${JSON.parse(e).id}`);
-          enterRoom(`${spaceName}-${JSON.parse(e).id}`);
+      const jwt = localStorage.getItem('vm-jwt');
+      if (!jwt) {
+        setSpaceName(undefined);
+        return;
+      }
+      if (!app?.me) {
+        setSpaceName(undefined);
+        return;
+      }
+
+      const onStage = (isEntered: boolean) => {
+        console.log(isEntered);
+        if (isEntered) {
+          vmConf.enterPlatform();
         } else {
-          console.info(`exited Room: ${spaceName}-${JSON.parse(e).id}`);
-          exitRoom(`${spaceName}-${JSON.parse(e).id}`);
+          vmConf.exitPlatform();
         }
       };
-      addEventListener("PrivateRoomEnter", privateRoomEnter);
-      addEventListener("GroupZoneEnter", privateRoomEnter);
+      addEventListener('StageEnter', onStage);
+      const enterRoom = (e: string) => {
+        const data = JSON.parse(e) as { state: 'ENTER' | 'EXIT'; id: string };
+        const roomName = `${spaceName}-${data.id}`;
+        if (data.state === 'ENTER') {
+          vmConf.enterRoom(roomName);
+          setRoomName(roomName)
+        } else {
+          vmConf.exitRoom(roomName);
+          setRoomName(undefined);
+        }
+      };
+
+      const onParticipantsChanged: VmeetingConferenceEventListener['ON_PARTICIPANTS_CHANGED'] = (participants) => setParticipants(participants);
+      const onPresentersChanged: VmeetingConferenceEventListener['ON_PRESENTERS_CHANGED'] = (presenters) => setPresenters(presenters);
+      const onRoomsChanged: VmeetingConferenceEventListener['ON_ROOMS_CHANGED'] = (rooms) => setRooms(rooms);
+
+      addEventListener('PrivateRoomEnter', enterRoom);
+      addEventListener('GroupZoneEnter', enterRoom);
+      vmConf.subscribe('ON_PARTICIPANTS_CHANGED',onParticipantsChanged);
+      vmConf.subscribe('ON_PRESENTERS_CHANGED', onPresentersChanged);
+      vmConf.subscribe('ON_ROOMS_CHANGED', onRoomsChanged);
+      vmConf.enter({ name: spaceName, jwt, me: app.me });
+      app.conference = vmConf;
       return () => {
-        removeEventListener("PrivateRoomEnter", privateRoomEnter);
-        removeEventListener("GroupZoneEnter", privateRoomEnter);
+        removeEventListener('StageEnter', onStage);
+        removeEventListener('PrivateRoomEnter', enterRoom);
+        removeEventListener('GroupZoneEnter', enterRoom);
+        vmConf.unsubscribe('ON_PARTICIPANTS_CHANGED',onParticipantsChanged);
+        vmConf.unsubscribe('ON_PRESENTERS_CHANGED', onPresentersChanged);
+        vmConf.unsubscribe('ON_ROOMS_CHANGED', onRoomsChanged);
+        vmConf.exit();
+        app.conference = undefined;
       };
     }
-  }, [app, spaceName]);
+  }, [spaceName, app]);
 
-  if (platformYN) {
-    return {
-      async enterSpace(name: string) {
-        if (name === "") {
-          return new Error("Name is needed");
-        }
-        setSpaceName(name);
-        await enterAuditorium(`${name}-platform`);
-      },
-      async exitSpace() {
-        await exitAuditorium();
-        app?.rooms.forEach(async (room, k) => {
-          await room.exit();
-          app.rooms.delete(k);
-        });
-        setSpaceName(undefined);
-      },
-      conferenceRoomParticipants: participants,
-      presenter: presenter,
-    };
-  } else {
-    return {
-      async enterSpace(name) {
-        if (name === "") {
-          return new Error("Name is needed");
-        }
-        setSpaceName(name);
-      },
-      async exitSpace() {
-        app?.rooms.forEach(async (room, k) => {
-          await room.exit();
-          app.rooms.delete(k);
-        });
-        setSpaceName(undefined);
-      },
-      conferenceRoomParticipants: participants,
-    };
-  }
+  const enterSpace = useCallback(
+    (name: string) => {
+      const jwt = localStorage.getItem('vm-jwt');
+      if (!jwt) return new Error('login is needed');
+      if (!app?.me) return new Error('player is needed');
+      if (spaceName) return new Error('already in space');
+      if (name === '') return new Error('Name is needed');
+      setSpaceName(name);
+    },
+    [spaceName, app],
+  );
+
+  const exitSpace = useCallback(() => {
+    setSpaceName(undefined);
+  }, []);
+
+  return {
+    participants,
+    nowPresenters,
+    nowRoomParticipants,
+    enterSpace,
+    exitSpace,
+    enterRoom: useCallback((roomName: string) => vmConf.enterRoom(roomName), [spaceName, app]),
+    exitRoom: useCallback((roomName: string) => vmConf.exitRoom(roomName), [spaceName, app]),
+  };
 };

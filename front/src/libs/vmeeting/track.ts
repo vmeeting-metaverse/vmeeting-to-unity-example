@@ -1,5 +1,6 @@
 import { vmeetingAPI } from './api';
 import { JitsiTrack } from './types';
+import { createVirtualBackgroundEffect } from '../VirtualBackground';
 
 export type VmeetingTrackEventListener = {
   ON_MUTE_CHANGED: (isMuted: boolean) => void;
@@ -122,16 +123,34 @@ export class VmeetingTrackRemoteAudio extends VmeetingTrackAudio {
 
 export class VmeetingTrackLocalVideo extends VmeetingTrackVideo {
   mode: 'camera' | 'screen';
+  useBackground: boolean;
+  backgroundUrl: string;
+
   constructor({ track, mode = 'camera' }: { track: JitsiTrack; mode?: 'camera' | 'screen' }) {
     super({ track });
     this.mode = mode;
+    this.useBackground = false;
+    this.backgroundUrl = '';
   }
+
   mute() {
     return this._track.mute();
   }
 
   unmute() {
     return this._track.unmute();
+  }
+
+  async useBackgroundEffect(useYN: boolean, url?: any) {
+    this.useBackground = useYN;
+
+    if (useYN) {
+      this.backgroundUrl = url;
+      this._track.setEffect(await createVirtualBackgroundEffect(url));
+    } else {
+      this.backgroundUrl = '';
+      this._track.setEffect(undefined);
+    }
   }
 }
 

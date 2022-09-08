@@ -1,15 +1,14 @@
 import { vmeetingAPI } from './api';
-import { VmeetingRoom } from './room';
+import { VmeetingConference } from './room';
 import { VmeetingTrackLocalAudio, VmeetingTrackLocalVideo } from './track';
 import { JitsiTrack } from './types';
 import { VmeetingMe } from './user';
 
 export class Vmeeting {
-  rooms: Map<string, VmeetingRoom>;
+  conference?: VmeetingConference;
   me: VmeetingMe;
   jwt: string;
   constructor({ me, jwt }: { me: VmeetingMe; jwt: string }) {
-    this.rooms = new Map();
     this.me = me;
     this.jwt = jwt;
   }

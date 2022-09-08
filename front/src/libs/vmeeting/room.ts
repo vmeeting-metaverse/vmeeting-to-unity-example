@@ -1,252 +1,347 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { VmeetingMe, VmeetingUser } from "./user";
-import { JitsiConference, JitsiConnection, JitsiTrack } from "./types";
-import _, { isArray } from "lodash";
-import { vmeetingAPI } from "./api";
-import { getConnectionOptions, roomOptions } from "./options";
+import jwtDecode from 'jwt-decode';
+import { vmeetingAPI } from './api';
+import { getConnectionOptions, roomOptions } from './options';
 import {
   VmeetingTrackLocalAudio,
   VmeetingTrackLocalVideo,
   VmeetingTrackRemoteAudio,
   VmeetingTrackRemoteVideo,
-} from "./track";
+} from './track';
+import { JitsiConference, JitsiConnection, JitsiParticipant, JitsiTrack } from './types';
+import { VmeetingMe, VmeetingUser } from './user';
+import { Mutex } from 'async-mutex';
 
-export type VmeetingRoomEventListener = {
+export type VmeetingConferenceEventListener = {
   ON_PARTICIPANTS_CHANGED: (participants: Map<string, VmeetingUser>) => void;
+  ON_ROOMS_CHANGED: (rooms: Map<string, string[]>) => void;
+  ON_PRESENTERS_CHANGED: (presenters: string[]) => void;
 };
 
-export type VmeetingRoomEvent = keyof VmeetingRoomEventListener;
+export type VmeetingConferenceEvent = keyof VmeetingConferenceEventListener;
 
-export class VmeetingRoom {
+let cnt = 0;
+
+export class VmeetingConference {
+  _conference: JitsiConference;
+  _connection: JitsiConnection;
+
   participants: Map<string, VmeetingUser>;
-  name: string;
+  rooms: Map<string, string[]>;
+  roomsMutex: Mutex;
+  presenters: string[];
+  presentersMutex: Mutex;
+  roomname?: string;
+
   listeners: {
-    [property in VmeetingRoomEvent]: {
+    [property in VmeetingConferenceEvent]: {
       origin: any;
       listener: any;
     }[];
   };
-  _connection: JitsiConnection;
-  _conference: JitsiConference;
-  constructor({ name }: { name: string }) {
+
+  constructor() {
     this.participants = new Map();
-    this.name = name;
-    this.listeners = {
-      ON_PARTICIPANTS_CHANGED: [],
-    };
-    this._connection = undefined;
+    this.rooms = new Map();
+    this.roomsMutex = new Mutex();
+    this.presenters = [];
+    this.presentersMutex = new Mutex();
+
     this._conference = undefined;
+    this._connection = undefined;
+
+    this.listeners = {
+      'ON_PARTICIPANTS_CHANGED': [],
+      'ON_PRESENTERS_CHANGED': [],
+      'ON_ROOMS_CHANGED': []
+    }
   }
 
-  enter({ jwt, me }: { jwt: string; me: VmeetingMe }) {
-    return new Promise((resolve, reject) => {
-      // * 1. create connection.
-      const connectionConfig = getConnectionOptions(this.name, jwt);
-      const connection = new vmeetingAPI._jitsi.JitsiConnection(
-        null,
-        null,
-        connectionConfig
-      );
+  async enter({ name, jwt, me }: { name: string; jwt: string; me: VmeetingMe }) {
+    try {
+      await new Promise((resolve, reject) => {
+        // * 1. create connection
+        const connectionConfig = getConnectionOptions(name, jwt);
+        const connection = new vmeetingAPI._jitsi.JitsiConnection(null, null, connectionConfig);
 
-      // * 2. declare onConnectionSuccessMethod
-      const onConnectionSuccess = () => {
-        console.info("Connection Success!");
-        const conference: JitsiConference = connection.initJitsiConference(
-          this.name,
-          roomOptions
-        );
-        this._conference = conference;
-
-        // * 3. subscribe user event
-        conference.on(
-          window.JitsiMeetJS.events.conference.USER_LEFT,
-          (id: string) => {
-            const newParticipants = _.cloneDeep(this.participants);
-            newParticipants.delete(id);
-            this.setParticipants(newParticipants);
-          }
-        );
-        conference.on(
-          window.JitsiMeetJS.events.conference.USER_JOINED,
-          (id: string) => {
-            const newParticipants = _.cloneDeep(this.participants);
-            newParticipants.set(
-              id,
-              new VmeetingUser({ id, isMe: id === conference.myUserId() })
-            );
-            this.setParticipants(newParticipants);
-          }
-        );
-        conference.on(
-          window.JitsiMeetJS.events.conference.TRACK_REMOVED,
-          (track: JitsiTrack) => {
-            if (track.isLocal()) return;
-            const participantId = track.getParticipantId();
-            const newParticipants = _.cloneDeep(this.participants);
-            const participant = newParticipants.get(participantId);
-            if (!participant) return;
-            if (track.getType() === "video") {
-              participant.video = undefined;
-            } else if (track.getType() === "audio") {
-              participant.audio = undefined;
-            }
-            this.setParticipants(newParticipants);
-          }
-        );
-        conference.on(
-          window.JitsiMeetJS.events.conference.TRACK_ADDED,
-          (track: JitsiTrack) => {
-            if (track.isLocal()) return;
-            const participantId = track.getParticipantId();
-            const newParticipants = _.cloneDeep(this.participants);
-            const participant = newParticipants.get(participantId);
-            if (!participant) return;
-            if (track.getType() === "video") {
-              participant.video = new VmeetingTrackRemoteVideo({ track });
-            } else if (track.getType() === "audio") {
-              participant.audio = new VmeetingTrackRemoteAudio({ track });
-            }
-            this.setParticipants(newParticipants);
-          }
-        );
-
-        // * 4. join the room
-        conference.join();
-
-        // * 5. add local change subscription
-        const onAudioChange = async (
-          oldAudio: VmeetingTrackLocalAudio,
-          newAudio: VmeetingTrackLocalAudio
-        ) => {
-          if (oldAudio) {
-            await conference.removeTrack(oldAudio._track);
-            await oldAudio.deconstructor();
-          }
-          conference.addTrack(newAudio._track);
+        const onConnectionSuccess = () => {
+          resolve('Connection Success!');
         };
-        me.subscribe("ON_AUDIO_CHANGED", onAudioChange);
-        const onVideoChange = async (
-          oldVideo: VmeetingTrackLocalVideo,
-          newVideo: VmeetingTrackLocalVideo
-        ) => {
-          if (oldVideo) {
-            await conference.removeTrack(oldVideo._track);
-            await oldVideo.deconstructor();
-          }
-          conference.addTrack(newVideo._track);
-        };
-        me.subscribe("ON_VIDEO_CHANGED", onVideoChange);
 
-        // * 6. add local track.
+        const onConnectionFailed = () => {
+          reject('Connection Failed');
+        };
+
+        const onDisconnected = () => {
+          reject('Disconnected!');
+        };
+
+        connection.addEventListener(vmeetingAPI._jitsi.events.connection.CONNECTION_ESTABLISHED, onConnectionSuccess);
+        connection.addEventListener(vmeetingAPI._jitsi.events.connection.CONNECTION_FAILED, onConnectionFailed);
+        connection.addEventListener(vmeetingAPI._jitsi.events.connection.CONNECTION_DISCONNECTED, onDisconnected);
+
+        this._connection = connection;
+        connection.connect();
+      });
+    } catch (e) {
+      return e;
+    }
+    return new Promise((resolve) => {
+      const conference: JitsiConference = this._connection.initJitsiConference(name, roomOptions);
+      this._conference = conference;
+
+      // set user display name to user.id
+      conference.setDisplayName((jwtDecode(jwt) as { context: { user: { id: string } } }).context.user.id);
+
+      const onOtherJoin = (pId: string, p: JitsiParticipant) => {
+        const newPs = new Map<string, VmeetingUser>();
+        this.participants.forEach((p, id) => {
+            newPs.set(id, p);
+        });
+        newPs.set(pId, new VmeetingUser({ id: pId, vmeetingId: p._displayName, isMe: pId === conference.myUserId() }));
+        this.setParticipants(newPs);
+      };
+
+      const onOtherLeft = (pId: string) => {
+        const newPs = new Map<string, VmeetingUser>();
+        this.participants.forEach((p, id) => {
+          if (id !== pId) {
+            newPs.set(id, p);
+          }
+        });
+        this.setParticipants(newPs);
+      };
+
+      const onTrackAdded = (track: JitsiTrack) => {
+        const pId = track.getParticipantId();
+        const p = this.participants.get(pId);
+        if (!p) return;
+        const newP = new VmeetingUser({ id: p.id, vmeetingId: p.vmeetingId, audio: p.audio, video: p.video, isMe: false });
+        switch (track.getType()) {
+          case 'video':
+            if (newP.video) 
+              newP.video.deconstructor();
+            newP.video = new VmeetingTrackRemoteVideo({ track });
+            break;
+          case 'audio':
+            if (newP.audio)
+              newP.audio.deconstructor();
+            newP.audio = new VmeetingTrackRemoteAudio({ track });
+            break;
+          default:
+            break;
+        }
+        const newPs = new Map<string, VmeetingUser>();
+        this.participants.forEach((p, id) => {
+          if (id === pId) {
+            newPs.set(id, newP);
+          } else {
+            newPs.set(id, p);
+          }
+        });
+        this.setParticipants(newPs);
+      };
+
+      const onTrackRemoved = (track: JitsiTrack) => {
+        const pId = track.getParticipantId();
+        const p = this.participants.get(pId);
+        if (!p) return;
+        const newP = new VmeetingUser({ id: p.id, vmeetingId: p.vmeetingId, audio: p.audio, video: p.video, isMe: false });
+        switch (track.getType()) {
+          case 'video':
+            newP.video?.deconstructor();
+            newP.video = undefined;
+            break;
+          case 'audio':
+            newP.audio?.deconstructor();
+            newP.audio = undefined;
+            break;
+          default:
+            break;
+        }
+        const newPs = new Map<string, VmeetingUser>();
+        this.participants.forEach((p, id) => {
+          if (id === pId) {
+            newPs.set(id, newP);
+          } else {
+            newPs.set(id, p);
+          }
+        });
+        this.setParticipants(newPs);
+      };
+
+      const onEnterRoom = async ({ attributes: { name, pId } }: { attributes: { name: string; pId: string } }) => {
+        if (pId === this._conference.myUserId()) return;
+        const release = await this.roomsMutex.acquire();
+        const newRooms = new Map<string, string[]>();
+        this.rooms.forEach((room, roomname) => {
+          if (roomname === name) {
+            newRooms.set(roomname, [...room, pId]);
+          } else {
+            newRooms.set(roomname, [...room]);
+          }
+        });
+        if (!newRooms.get(name)) {
+          newRooms.set(name, [pId]);
+        }
+        this.setRooms(newRooms);
+        release();
+      };
+
+      const onExitRoom = async ({ attributes: { name, pId } }: { attributes: { name: string; pId: string } }) => {
+        if (pId === this._conference.myUserId()) return;
+        const release = await this.roomsMutex.acquire();
+        const room = this.rooms.get(name);
+        if (room) {
+          if (room.includes(pId)) {
+            const newRooms = new Map<string, string[]>();
+            this.rooms.forEach((room, roomname) => {
+              if (roomname === name) {
+                newRooms.set(roomname, room.filter((id) => id !== pId));
+              } else {
+                newRooms.set(roomname, [...room]);
+              }
+            })
+            this.setRooms(newRooms);
+          }
+        }
+        release();
+      };
+
+      const onEnterPlatform = async ({ attributes: { pId } }: { attributes: { pId: string } }) => {
+        if (pId === this._conference.myUserId()) return;
+        const release = await this.presentersMutex.acquire();
+        if (!this.presenters.includes(pId)) {
+          this.setPresenters([...this.presenters, pId]);
+        }
+        release();
+      };
+
+      const onExitPlatform = async ({ attributes: { pId } }: { attributes: { pId: string } }) => {
+        if (pId === this._conference.myUserId()) return;
+        const release = await this.presentersMutex.acquire();
+        if (this.presenters.includes(pId)) {
+          this.setPresenters(this.presenters.filter((id) => id !== pId));
+        }
+        release();
+      };
+
+      const onAudioChange = async (oldAudio: VmeetingTrackLocalAudio, newAudio: VmeetingTrackLocalAudio) => {
+        if (oldAudio) {
+          await conference.removeTrack(oldAudio._track);
+        }
+        conference.addTrack(newAudio._track);
+      };
+
+      const onVideoChange = async (oldVideo: VmeetingTrackLocalVideo, newVideo: VmeetingTrackLocalVideo) => {
+        if (oldVideo) {
+          await conference.removeTrack(oldVideo._track);
+        }
+        conference.addTrack(newVideo._track);
+      };
+
+      const onJoined = () => {
+        console.log("JOINED");
+        me.subscribe('ON_AUDIO_CHANGED', onAudioChange);
+        me.subscribe('ON_VIDEO_CHANGED', onVideoChange);
+
+        // * 5. add local track.
         if (me.audio?._track) {
           conference.addTrack(me.audio._track);
         }
         if (me.video?._track) {
           conference.addTrack(me.video._track);
         }
-
-        const onConferenceLeft = () => {
-          me.unsubscribe("ON_AUDIO_CHANGED", onAudioChange);
-          me.unsubscribe("ON_VIDEO_CHANGED", onVideoChange);
-        };
-
-        conference.addEventListener(
-          vmeetingAPI._jitsi.events.conference.CONFERENCE_LEFT,
-          onConferenceLeft
-        );
-
-        // * 7. subscribe ondisconnected for removing subscription in me.
-        const onDisconnected = () => {
-          connection.removeEventListener(
-            vmeetingAPI._jitsi.events.connection.CONNECTION_DISCONNECTED,
-            onDisconnected
-          );
-          conference.removeEventListener(
-            vmeetingAPI._jitsi.events.conference.CONFERENCE_LEFT,
-            onConferenceLeft
-          );
-        };
-        connection.addEventListener(
-          vmeetingAPI._jitsi.events.connection.CONNECTION_DISCONNECTED,
-          onDisconnected
-        );
-
-        // * 8. delete my event listener.
-        connection.removeEventListener(
-          vmeetingAPI._jitsi.events.connection.CONNECTION_ESTABLISHED,
-          onConnectionSuccess
-        );
-        resolve("success");
+        resolve('Success Enter Conference');
       };
 
-      const onConnectionFailed = () => {
-        console.error("Connection Failed!");
-        reject("Connection Failed!");
+      const onLeft = () => {
+        conference.off(vmeetingAPI._jitsi.events.conference.CONFERENCE_JOINED, onJoined);
+        conference.off(vmeetingAPI._jitsi.events.conference.CONFERENCE_LEFT, onLeft);
+        conference.off(window.JitsiMeetJS.events.conference.USER_JOINED, onOtherJoin);
+        conference.off(window.JitsiMeetJS.events.conference.USER_LEFT, onOtherLeft);
+        conference.off(window.JitsiMeetJS.events.conference.TRACK_ADDED, onTrackAdded);
+        conference.off(window.JitsiMeetJS.events.conference.TRACK_REMOVED, onTrackRemoved);
+
+        conference.removeCommandListener('ENTER_ROOM', onEnterRoom);
+        conference.removeCommandListener('EXIT_ROOM', onExitRoom);
+        conference.removeCommandListener('ENTER_PLATFORM', onEnterPlatform);
+        conference.removeCommandListener('EXIT_PLATFORM', onExitPlatform);
       };
 
-      const disconnect = () => {
-        console.log("disconnect!");
-        connection.removeEventListener(
-          vmeetingAPI._jitsi.events.connection.CONNECTION_ESTABLISHED,
-          onConnectionSuccess
-        );
-        connection.removeEventListener(
-          vmeetingAPI._jitsi.events.connection.CONNECTION_FAILED,
-          onConnectionFailed
-        );
-        connection.removeEventListener(
-          vmeetingAPI._jitsi.events.connection.CONNECTION_DISCONNECTED,
-          disconnect
-        );
-      };
+      conference.on(vmeetingAPI._jitsi.events.conference.CONFERENCE_JOINED, onJoined);
+      conference.on(vmeetingAPI._jitsi.events.conference.CONFERENCE_LEFT, onLeft);
+      conference.on(window.JitsiMeetJS.events.conference.USER_JOINED, onOtherJoin);
+      conference.on(window.JitsiMeetJS.events.conference.USER_LEFT, onOtherLeft);
+      conference.on(window.JitsiMeetJS.events.conference.TRACK_ADDED, onTrackAdded);
+      conference.on(window.JitsiMeetJS.events.conference.TRACK_REMOVED, onTrackRemoved);
 
-      connection.addEventListener(
-        vmeetingAPI._jitsi.events.connection.CONNECTION_ESTABLISHED,
-        onConnectionSuccess
-      );
-      connection.addEventListener(
-        vmeetingAPI._jitsi.events.connection.CONNECTION_FAILED,
-        onConnectionFailed
-      );
-      connection.addEventListener(
-        vmeetingAPI._jitsi.events.connection.CONNECTION_DISCONNECTED,
-        disconnect
-      );
-      connection.connect();
+      conference.addCommandListener('ENTER_ROOM', onEnterRoom);
+      conference.addCommandListener('EXIT_ROOM', onExitRoom);
+      conference.addCommandListener('ENTER_PLATFORM', onEnterPlatform);
+      conference.addCommandListener('EXIT_PLATFORM', onExitPlatform);
+
+      conference.join();
     });
   }
 
   async exit() {
-    if (this._conference) await this._conference?.leave();
-    if (this._connection) await this._connection?.disconnect();
+    if (this.roomname) {
+      this.exitRoom(this.roomname);
+    }
+    if (this.presenters.includes(this._conference.myUserId())) {
+      this.exitPlatform();
+    }
+    if (this._conference)
+      await this._conference.leave();
+    if (this._connection)
+      await this._connection.disconnect();
     this._conference = undefined;
     this._connection = undefined;
+    this.participants = new Map();
+    this.presenters = [];
+    this.rooms = new Map();
   }
 
-  subscribe<T extends VmeetingRoomEvent>(
-    subject: T,
-    cb: VmeetingRoomEventListener[T]
-  ) {
-    let listener;
-    switch (subject) {
-      case "ON_PARTICIPANTS_CHANGED":
-        listener = (participants: Map<string, VmeetingUser>) => {
-          cb(participants);
-        };
-        break;
-      default:
-        break;
-    }
-    this.listeners[subject]?.push({
-      origin: cb,
-      listener: listener,
+  enterRoom(name: string) {
+    this._conference.sendCommand('ENTER_ROOM', {
+      value: cnt++,
+      attributes: { name, pId: this._conference.myUserId() },
+    });
+    this.roomname = name;
+  }
+
+  exitRoom(name: string) {
+    this._conference.sendCommand('EXIT_ROOM', {
+      value: cnt++,
+      attributes: { name, pId: this._conference.myUserId() },
+    });
+    this.roomname = undefined;
+  }
+
+  enterPlatform() {
+    this._conference.sendCommand('ENTER_PLATFORM', {
+      value: cnt++,
+      attributes: { pId: this._conference.myUserId() },
     });
   }
 
-  unsubscribe<T extends VmeetingRoomEvent>(
-    subject: T,
-    cb: VmeetingRoomEventListener[T]
-  ) {
+  exitPlatform() {
+    this._conference.sendCommand('EXIT_PLATFORM', {
+      value: cnt++,
+      attributes: { pId: this._conference.myUserId() },
+    });
+  }
+
+
+  subscribe<T extends VmeetingConferenceEvent>(subject: T, cb: VmeetingConferenceEventListener[T]) {
+    
+    this.listeners[subject].push({
+      origin: cb,
+      listener: cb,
+    });
+  }
+
+  unsubscribe<T extends VmeetingConferenceEvent>(subject: T, cb: VmeetingConferenceEventListener[T]) {
     const idx = this.listeners[subject].findIndex((l) => {
       l.origin === cb;
     });
@@ -264,193 +359,18 @@ export class VmeetingRoom {
       l.listener(participants);
     });
   }
-}
 
-export type VmeetingAuditoriumEventListener = VmeetingRoomEventListener & {
-  ON_CHANGE_PLATFORM_OCCUPIER: (occupier?: VmeetingUser) => void;
-};
-
-export type VmeetingAuditoriumEvent = keyof VmeetingAuditoriumEventListener;
-
-export class VmeetingAudiotorium extends VmeetingRoom {
-  occupier?: VmeetingUser;
-  listeners: {
-    [property in VmeetingAuditoriumEvent]: {
-      origin: any;
-      listener: any;
-    }[];
-  };
-
-  constructor({ name }: { name: string }) {
-    super({ name });
-    this.listeners = {
-      ON_PARTICIPANTS_CHANGED: [],
-      ON_CHANGE_PLATFORM_OCCUPIER: [],
-    };
-    this.occupier = undefined;
-  }
-
-  subscribe<T extends VmeetingAuditoriumEvent>(
-    subject: T,
-    cb: VmeetingAuditoriumEventListener[T]
-  ) {
-    let listener;
-
-    switch (subject) {
-      case "ON_PARTICIPANTS_CHANGED":
-        listener = (participants: any) => {
-          cb(participants);
-        };
-        break;
-      case "ON_CHANGE_PLATFORM_OCCUPIER":
-        listener = (values: any) => {
-          switch (values.tagName) {
-            case "ON_OCCUPY_THE_PLATFORM":
-              const participantId = values.value;
-              let occupier: VmeetingUser | undefined;
-              if (participantId === this._conference.myUserId()) {
-                const videos = this._conference
-                  .getLocalTracks()
-                  .filter((t: JitsiTrack) => t.getType() === "video");
-                const audios = this._conference
-                  .getLocalTracks()
-                  .filter((t: JitsiTrack) => t.getType() === "audio");
-                occupier = new VmeetingUser({
-                  id: participantId,
-                  video:
-                    (isArray(videos) &&
-                      videos.length > 0 &&
-                      new VmeetingTrackRemoteVideo({ track: videos[0] })) ||
-                    undefined,
-                  audio:
-                    (isArray(audios) &&
-                      audios.length > 0 &&
-                      new VmeetingTrackRemoteAudio({ track: audios[0] })) ||
-                    undefined,
-                  isMe: true,
-                });
-              } else {
-                const participants = this._conference.getParticipants();
-                const pIdx = participants.findIndex(
-                  (e: any) => e._id === participantId
-                );
-                if (pIdx > -1) {
-                  const participant = participants[pIdx];
-                  const videos = participant.getTracksByMediaType("video");
-                  const audios = participant.getTracksByMediaType("audio");
-
-                  occupier = new VmeetingUser({
-                    id: participantId,
-                    video:
-                      (isArray(videos) &&
-                        videos.length > 0 &&
-                        new VmeetingTrackRemoteVideo({ track: videos[0] })) ||
-                      undefined,
-                    audio:
-                      (isArray(audios) &&
-                        audios.length > 0 &&
-                        new VmeetingTrackRemoteAudio({ track: audios[0] })) ||
-                      undefined,
-                    isMe: false,
-                  });
-                }
-              }
-
-              if (!occupier) {
-                console.log(`This participant is not exist, ${participantId}`);
-                return;
-              }
-
-              this.setOccupier(occupier);
-              break;
-            case "ON_EMPTY_THE_PLATFORM":
-              this.setOccupier(undefined);
-              break;
-          }
-          cb(this.occupier as any);
-        };
-
-        this._conference.addCommandListener("ON_OCCUPY_THE_PLATFORM", listener);
-        this._conference.addCommandListener("ON_EMPTY_THE_PLATFORM", listener);
-        this.subscribe("ON_PARTICIPANTS_CHANGED", (participants) => {
-          if (this.occupier) {
-            const newOccupier = participants.get(this.occupier.id);
-            if (
-              newOccupier &&
-              (newOccupier.audio?._track.getTrackId() !==
-                this.occupier.audio?._track.getTrackId() ||
-                newOccupier.video?._track.getTrackId() !==
-                  this.occupier.video?._track.getTrackId())
-            ) {
-              this.setOccupier(newOccupier);
-              cb(this.occupier as any);
-            }
-          }
-        });
-
-        break;
-      default:
-        break;
-    }
-    this.listeners[subject]?.push({
-      origin: cb,
-      listener: listener,
+  setPresenters(presenters: string[]) {
+    this.presenters = presenters;
+    this.listeners.ON_PRESENTERS_CHANGED.forEach((l) => {
+      l.listener(presenters);
     });
   }
 
-  unsubscribe<T extends VmeetingAuditoriumEvent>(
-    subject: T,
-    cb: VmeetingAuditoriumEventListener[T]
-  ) {
-    const idx = this.listeners[subject].findIndex((l) => {
-      l.origin === cb;
-    });
-    if (idx > -1) {
-      switch (subject) {
-        case "ON_PARTICIPANTS_CHANGED":
-          break;
-        case "ON_CHANGE_PLATFORM_OCCUPIER":
-          this._conference.removeCommandListener(
-            "ON_OCCUPY_THE_PLATFORM",
-            this.listeners[subject][idx]
-          );
-          this._conference.removeCommandListener(
-            "ON_EMPTY_THE_PLATFORM",
-            this.listeners[subject][idx]
-          );
-          break;
-      }
-      this.listeners = {
-        ...this.listeners,
-        [subject]: this.listeners[subject].filter((_, index) => index !== idx),
-      };
-    }
-  }
-
-  getOnThePlatform() {
-    if (this.occupier) {
-      return new Error("Platform is already occupied");
-    }
-    const participantId = this._conference.myUserId();
-    this._conference.sendCommandOnce("ON_OCCUPY_THE_PLATFORM", {
-      value: participantId,
-    });
-  }
-
-  getOffThePlatform() {
-    if (!this.occupier) {
-      return new Error("Platform is already empty");
-    }
-    const participantId = this._conference.myUserId();
-    if (this.occupier.id !== participantId) {
-      return new Error("You are not an occupier");
-    }
-    this._conference.sendCommandOnce("ON_EMPTY_THE_PLATFORM", {
-      value: participantId,
-    });
-  }
-
-  setOccupier(occupier?: VmeetingUser) {
-    this.occupier = occupier;
+  setRooms(rooms: Map<string, string[]>) {
+    this.rooms = rooms;
+    this.listeners.ON_ROOMS_CHANGED.forEach((l) => {
+      l.listener(rooms);
+    })
   }
 }

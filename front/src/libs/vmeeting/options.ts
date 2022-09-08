@@ -31,4 +31,20 @@ export const roomOptions = {
   p2p: {
     enabled: false,
   },
+  // based on : https://community.jitsi.org/t/delay-with-lib-jitsi-meet-js-replacetrack/111968/18
+  videoQuality: {
+    preferredCodec: 'VP9',
+    maxBitratesVideo: {
+      VP8: {
+        low: 200000,
+        standard: 500000,
+        high: 1500000,
+      },
+      VP9: {
+        low: 100000,
+        standard: 300000,
+        high: 1200000,
+      },
+    },
+  },
 };
