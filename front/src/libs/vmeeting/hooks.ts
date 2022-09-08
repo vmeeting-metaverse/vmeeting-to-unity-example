@@ -77,17 +77,14 @@ export const useVmeetingSpace = (unityContext: IUnityContextHook) => {
       const onPresentersChanged: VmeetingConferenceEventListener['ON_PRESENTERS_CHANGED'] = (presenters) => setPresenters(presenters);
       const onRoomsChanged: VmeetingConferenceEventListener['ON_ROOMS_CHANGED'] = (rooms) => setRooms(rooms);
 
-      addEventListener('PrivateRoomEnter', enterRoom);
-      addEventListener('GroupZoneEnter', enterRoom);
+      addEventListener('VmeetingRequest', enterRoom);
       vmConf.subscribe('ON_PARTICIPANTS_CHANGED',onParticipantsChanged);
       vmConf.subscribe('ON_PRESENTERS_CHANGED', onPresentersChanged);
       vmConf.subscribe('ON_ROOMS_CHANGED', onRoomsChanged);
       vmConf.enter({ name: spaceName, jwt, me: app.me });
       app.conference = vmConf;
       return () => {
-        removeEventListener('StageEnter', onStage);
-        removeEventListener('PrivateRoomEnter', enterRoom);
-        removeEventListener('GroupZoneEnter', enterRoom);
+        removeEventListener('VmeetingRequest', enterRoom);
         vmConf.unsubscribe('ON_PARTICIPANTS_CHANGED',onParticipantsChanged);
         vmConf.unsubscribe('ON_PRESENTERS_CHANGED', onPresentersChanged);
         vmConf.unsubscribe('ON_ROOMS_CHANGED', onRoomsChanged);
@@ -119,7 +116,5 @@ export const useVmeetingSpace = (unityContext: IUnityContextHook) => {
     nowRoomParticipants,
     enterSpace,
     exitSpace,
-    enterRoom: useCallback((roomName: string) => vmConf.enterRoom(roomName), [spaceName, app]),
-    exitRoom: useCallback((roomName: string) => vmConf.exitRoom(roomName), [spaceName, app]),
   };
 };

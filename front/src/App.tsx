@@ -31,17 +31,18 @@ function App() {
       ) => setVideo(video);
       const init = async () => {
         app.me.subscribe("ON_VIDEO_CHANGED", onVideoChange);
-        const devices = await app.me.getMediaDevices();
         if (!app.me.video) {
           const newVideo = await app.createVideo();
           if (newVideo) {
             app.me.setVideo(newVideo);
           }
         }
+
       };
       init();
       return () => {
         app.me.unsubscribe("ON_VIDEO_CHANGED", onVideoChange);
+
       };
     }
   }, [app]);
@@ -49,23 +50,20 @@ function App() {
   useEffect(() => {
     if (video) {
       video.attach(localVideoRef.current);
+      enterSpace('test');
+      return () => {
+        exitSpace();
+      }
     }
   }, [video]);
 
   const { enterSpace, exitSpace, nowRoomParticipants } = useVmeetingSpace(unityCtx);
 
   useEffect(() => {
-    enterSpace('test');
-    return () => {
-      exitSpace();
-    }
-  }, []);
-
-  useEffect(() => {
     if (nowRoomParticipants.size > 0) {
       const p = nowRoomParticipants.values().next();
       if (p) {
-        p.value.video.attach(remoteVideoRef);
+        p.value.video?.attach(remoteVideoRef.current);
       }
     }
   }, [nowRoomParticipants]);
