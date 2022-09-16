@@ -20,17 +20,14 @@ export default class FrameSender {
     _outputCanvasCtx: any;
     _inputVideoRef: any;
     _unityContext: any;
-    _model: any;
 
-    constructor(inputRef: any, unityContext: any, id: any, model: any) {
+    constructor(inputRef: any, unityContext: any, id: any) {
         // Bind event handler so it is only bound once for every instance.
         this._onMaskFrameTimer = this._onMaskFrameTimer.bind(this);
 
         this._id = id;
         this._inputVideoRef = inputRef;
         this._unityContext = unityContext;
-
-        this._model = model;
 
         this._outputCanvasElement = document.createElement('canvas');
         this._outputCanvasElement.getContext('2d');
@@ -61,38 +58,8 @@ export default class FrameSender {
         this._unityContext.sendMessage('CommManager', 'comm_setImage', param_string);
     }
 
-    onResults = (results: any) => {
-        // Draw segmentation mask.
-        // Smooth out the edges.
-        this._outputCanvasCtx.globalCompositeOperation = 'copy';
-        this._outputCanvasCtx.filter = 'blur(4px)';
-        this._outputCanvasCtx.drawImage(
-            results.segmentationMask,
-            0,
-            0,
-            this._outputCanvasElement.width,
-            this._outputCanvasElement.height
-        );
-        this._outputCanvasCtx.globalCompositeOperation = 'source-in';
-        this._outputCanvasCtx.filter = 'none';
-        this._outputCanvasCtx.drawImage(
-        results.image, 0, 0, this._inputVideoRef.current.offsetWidth, this._inputVideoRef.current.offsetHeight);
-        
-        // Change parameter of toDataUrl for better quality (0 ~ 1)
-        const dataURL = this._outputCanvasElement.toDataURL('image/png', 0.1);
-        const base64 = this.getBase64StringFromDataURL(dataURL);
-    
-        const param = {
-          id: this._id,
-          data: base64,
-        };
-        const param_string = JSON.stringify(param);
-        this._unityContext.sendMessage('CommManager', 'comm_setImage', param_string);
-    }
-
     _renderMask = async () => {
-        //this.convertAndSend();
-        await this._model.send({ image: this._inputVideoRef.current });
+        this.convertAndSend();
 
         this._maskFrameTimerWorker.postMessage({
             id: SET_TIMEOUT,
@@ -111,8 +78,6 @@ export default class FrameSender {
         this._outputCanvasElement.height = parseInt(height, 10);
         this._outputCanvasCtx = this._outputCanvasElement.getContext('2d');
 
-        this._model.onResults(this.onResults);
-
         this._maskFrameTimerWorker.postMessage({
             id: SET_TIMEOUT,
             timeMs: 1000 / 15
@@ -125,8 +90,6 @@ export default class FrameSender {
      * @returns {void}
      */
     stopSend() {
-        this._model.close();
-
         this._maskFrameTimerWorker.postMessage({
             id: CLEAR_TIMEOUT
         });

@@ -124,13 +124,11 @@ export class VmeetingTrackRemoteAudio extends VmeetingTrackAudio {
 export class VmeetingTrackLocalVideo extends VmeetingTrackVideo {
   mode: 'camera' | 'screen';
   useBackground: boolean;
-  backgroundUrl: string;
 
   constructor({ track, mode = 'camera' }: { track: JitsiTrack; mode?: 'camera' | 'screen' }) {
     super({ track });
     this.mode = mode;
     this.useBackground = false;
-    this.backgroundUrl = '';
   }
 
   mute() {
@@ -141,14 +139,12 @@ export class VmeetingTrackLocalVideo extends VmeetingTrackVideo {
     return this._track.unmute();
   }
 
-  async useBackgroundEffect(useYN: boolean, url?: any) {
+  async useBackgroundEffect(useYN: boolean) {
     this.useBackground = useYN;
 
     if (useYN) {
-      this.backgroundUrl = url;
-      this._track.setEffect(await createVirtualBackgroundEffect(url));
+      this._track.setEffect(await createVirtualBackgroundEffect());
     } else {
-      this.backgroundUrl = '';
       this._track.setEffect(undefined);
     }
   }

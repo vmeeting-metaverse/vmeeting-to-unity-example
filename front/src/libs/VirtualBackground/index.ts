@@ -11,7 +11,7 @@ import { SelfieSegmentation } from "@mediapipe/selfie_segmentation";
  * @param {Function} dispatch - The Redux dispatch function.
  * @returns {Promise<JitsiStreamBackgroundEffect>}
  */
-export async function createVirtualBackgroundEffect(backgroundUrl: string) {
+export async function createVirtualBackgroundEffect() {
     // Checks if WebAssembly feature is supported or enabled by/in the browser.
     // Conditional import of wasm-check package is done to prevent
     // the browser from crashing when the user opens the app.
@@ -26,5 +26,5 @@ export async function createVirtualBackgroundEffect(backgroundUrl: string) {
         selfieMode: false,
       });
 
-    return new BackgroundEffect(selfieSegmentation, backgroundUrl);
+    return new BackgroundEffect(selfieSegmentation);
 }

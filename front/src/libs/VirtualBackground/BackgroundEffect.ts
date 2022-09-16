@@ -26,7 +26,6 @@ export default class BackgroundEffect {
     _maskFrameTimerWorker: any;
     _outputCanvasElement: HTMLCanvasElement;
     _outputCanvasCtx: any;
-    _virtualImage: any;
 
     /**
      * Represents a modified video MediaStream track.
@@ -35,11 +34,7 @@ export default class BackgroundEffect {
      * @param {Object} model - Meet model.
      * @param {Object} options - Segmentation dimensions.
      */
-    constructor(model: any, imgUrl: any) {
-        this._virtualImage = document.createElement('img');
-        this._virtualImage.crossOrigin = 'anonymous';
-        this._virtualImage.src = imgUrl;
-
+    constructor(model: any) {
         this._model = model;
 
         // Bind event handler so it is only bound once for every instance.
@@ -87,13 +82,10 @@ export default class BackgroundEffect {
 
         // Draw the background.
         this._outputCanvasCtx.globalCompositeOperation = 'destination-over';
-        this._outputCanvasCtx.drawImage(
-            this._virtualImage,
-            0,
-            0,
-            this._outputCanvasElement.width,
-            this._outputCanvasElement.height
-        );
+        this._outputCanvasCtx.beginPath();
+        this._outputCanvasCtx.rect(0, 0, this._outputCanvasElement.width, this._outputCanvasElement.height);
+        this._outputCanvasCtx.fillStyle = 'rgb(0, 255, 0)';
+        this._outputCanvasCtx.fill();
     };
 
     _renderMask = async () => {

@@ -40,10 +40,10 @@ function App() {
         if (!app.me.video) {
           const newVideo = await app.createVideo();
           if (newVideo) {
+            await newVideo.useBackgroundEffect(true);
             app.me.setVideo(newVideo);
           }
         }
-
       };
       init();
       return () => {
