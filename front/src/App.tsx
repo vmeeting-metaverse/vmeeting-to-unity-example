@@ -7,6 +7,7 @@ import { useVmeetingSpace } from './libs/vmeeting/hooks';
 import { createFrameSender } from './libs/FrameSender';
 import { useVmeeting } from './providers/Vmeeting';
 import { VmeetingTrackLocalVideo } from './libs/vmeeting/track';
+import { DUMMY_JWT } from './libs/constants';
 
 const ROOT = process.env.PUBLIC_URL;
 const BUILD_URL = ROOT + '/Build';
@@ -23,6 +24,11 @@ function App() {
   const [video, setVideo] = useState<VmeetingTrackLocalVideo>();
 
   const app = useVmeeting();
+
+  useEffect(() => {
+    localStorage.setItem('vm-jwt', DUMMY_JWT);
+  }, []);
+
   useEffect(() => {
     if (app?.me) {
       const onVideoChange = (
