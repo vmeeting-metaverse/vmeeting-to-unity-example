@@ -76,16 +76,16 @@ function App() {
   let localVideoFrameSender: any = null;
   let remoteVideoFrameSender: any = null;
 
-  const onClickSend = (id: any) => {
+  const onClickSend = async (id: any) => {
     if (id === "1") {
       if (!localVideoFrameSender) {
-        localVideoFrameSender = createFrameSender(localVideoRef, unityCtx, "1");
+        localVideoFrameSender = await createFrameSender(localVideoRef, unityCtx, "1");
         localVideoFrameSender.startSend();
       }
     }
     else if (id === "2") {
       if (!remoteVideoFrameSender) {
-        remoteVideoFrameSender = createFrameSender(remoteVideoRef, unityCtx, "2");
+        remoteVideoFrameSender = await createFrameSender(remoteVideoRef, unityCtx, "2");
         remoteVideoFrameSender.startSend();
       }
     }
