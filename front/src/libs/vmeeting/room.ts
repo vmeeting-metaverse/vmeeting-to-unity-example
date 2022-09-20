@@ -89,15 +89,16 @@ export class VmeetingConference {
       const conference: JitsiConference = this._connection.initJitsiConference(name, roomOptions);
       this._conference = conference;
 
-      // set user display name to user.id
-      conference.setDisplayName((jwtDecode(jwt) as { context: { user: { id: string } } }).context.user.id);
+      // set user display name to user.id & me.name
+      conference.setDisplayName(JSON.stringify({ vmeetingId: (jwtDecode(jwt) as { context: { user: { id: string } } }).context.user.id, name: me.name }));
 
       const onOtherJoin = (pId: string, p: JitsiParticipant) => {
         const newPs = new Map<string, VmeetingUser>();
         this.participants.forEach((p, id) => {
             newPs.set(id, p);
         });
-        newPs.set(pId, new VmeetingUser({ id: pId, vmeetingId: p._displayName, isMe: pId === conference.myUserId() }));
+        const dn = JSON.parse(p._displayName);
+        newPs.set(pId, new VmeetingUser({ id: pId, vmeetingId: dn.vmeetingId, name: dn.name, isMe: pId === conference.myUserId() }));
         this.setParticipants(newPs);
       };
 
