@@ -22,8 +22,10 @@
 
 ### DUMMY VMEETING TOKEN 설정
 
-vmeeting API는 vmeeting JWT가 있어야 정상작동하기 때문에 해당 token을 만기시에는 재설정해주어야 한다.   
-따라서, https://twon.vmeeting.kr에 가입하고 로그인하여 vmeeting jwt를 얻고 그것을 `/front/src/libs/constants.ts`에 DUMMY_JWT에 등록해야한다.
+~~vmeeting API는 vmeeting JWT가 있어야 정상작동하기 때문에 해당 token을 만기시에는 재설정해주어야 한다.   
+따라서, https://twon.vmeeting.kr에 가입하고 로그인하여 vmeeting jwt를 얻고 그것을 `/front/src/libs/constants.ts`에 DUMMY_JWT에 등록해야한다.~~
+
+https://twon.vmeeting.kr 에 로그인 하지 않고 사용할 수 있도록 설정하여서 불필요
 
 ### Unity Build File 적용하기
 
